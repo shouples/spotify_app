@@ -1,0 +1,16 @@
+body{
+    background-color: #191919;
+}
+
+p {
+    color: #eee;
+}
+
+.form-text {
+    color: #eee;
+}
+
+.mantine-Chips-label, .mantine-Chips-filled{
+    background-color: #555;
+    color: white,
+}

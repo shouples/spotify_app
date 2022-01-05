@@ -1,15 +1,17 @@
 from dash import dcc, html, Input, Output, State, ALL, MATCH
-from flask import request
-
-import spotipy
-
 import dash
+import dash_bootstrap_components as dbc
+import dash_mantine_components as dmc
+
+from flask import request
+from urllib import parse
+
 import os
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 import pprint
-from urllib import parse
+import spotipy
 
 
 SCOPE = 'user-library-read playlist-read-private'
@@ -78,14 +80,26 @@ def register_callbacks(app):
 
         user = client.me()
         username = user['display_name']
+        user_icon = user['images'][0]['url']
         logger.info(f"user info: {user}")
-        return f"Hello, {username}."
+
+        user_bar = dbc.Row([
+            dbc.Col(
+                html.Img(
+                    src=user_icon,
+                    height='50px',
+                )
+            ),
+            dbc.Col(
+                html.H5(username, style={'color': '#ccc'})
+            ),
+        ])
+        return user_bar
 
 
     @app.callback(
-        Output('user-playlists', 'options'),
+        Output('playlists', 'data'),
         Input('sign-in-token', 'data'),
-        prevent_initial_call=True,
     )
     def show_playlists(token):
         if not token:
@@ -101,19 +115,30 @@ def register_callbacks(app):
             return []
         playlists = playlist_resp['items']
         logger.info(f"playlists: {len(playlists)} --> {playlists[0]}")
-        return [{'label': p['name'], 'value': p['id']} for p in playlists]
+
+        char_limit = 40
+        options = []
+        for playlist in playlists:
+            playlist_label = playlist['name'][:char_limit]
+            if len(playlist['name']) > char_limit:
+                playlist_label += "..."
+            options.append({
+                'label': playlist_label, 
+                'value': playlist['id']
+            })
+        # options = sorted(options, key=lambda x: x['label'])
+        return options
 
 
     @app.callback(
         Output('track-data', 'data'),
-        Input('load-playlist', 'n_clicks'),
+        Input('playlists', 'value'),
         [
             State('sign-in-token', 'data'),
-            State('user-playlists', 'value'),
-            State('user-playlists', 'options'),
+            State('playlists', 'data'),
         ]
     )
-    def load_playlist_tracks(clicks, token, playlist_ids, playlist_options):
+    def load_playlist_tracks(playlist_ids, token, playlist_options):
         if not (token and playlist_ids):
             return []
 
@@ -193,8 +218,9 @@ def register_callbacks(app):
         df = pd.DataFrame(data)
         columns = [
             c for c in df.columns 
-            if c.endswith((".uri", ".id", "available_markets"))
+            if c.endswith((".uri", ".id", "available_markets", "isrc"))
             or "_url" in c or "href" in c
+            or c == 'id'
         ]
         return columns
 
@@ -245,7 +271,7 @@ def register_callbacks(app):
     def render_scatterplot(xaxis, yaxis, zaxis, colorby, data):
         fig = go.Figure()
         fig.update_layout(
-            template='plotly_white',
+            template='plotly_dark',
             height=600,
             margin=dict(t=30, l=0, r=0, b=0),
         )
@@ -292,9 +318,8 @@ def register_callbacks(app):
             fig.update_layout(
                 xaxis_title=xaxis,
                 yaxis_title=yaxis,
-                zaxis_title=zaxis,
             )
-            
+
         return fig
 
 
