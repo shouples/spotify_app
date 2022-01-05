@@ -6,6 +6,7 @@ import dash_mantine_components as dmc
 from flask import request
 from urllib import parse
 
+import logging
 import os
 import pandas as pd
 import plotly.express as px
@@ -13,6 +14,12 @@ import plotly.graph_objs as go
 import pprint
 import spotipy
 
+
+logging.basicConfig(
+    format="%(asctime)s | %(levelname)s | %(name)s.%(funcName)s | %(msg)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 SCOPE = 'user-library-read playlist-read-private'
 
@@ -147,31 +154,45 @@ def register_callbacks(app):
         client = spotipy.Spotify(auth_manager=auth_manager)
 
         playlist_id_to_name = {p['value']: p['label'] for p in playlist_options}
+
         data = []
         for playlist_id in playlist_ids:
+
             # pull playlist information to get tracks
-            playlist_info = client.playlist(playlist_id)
-            logger.info(f"playlist `{playlist_id}` track --> {pprint.pformat(playlist_info, depth=2)}")
-            tracks = playlist_info['tracks']['items']
+            playlist_resp = client.playlist_items(playlist_id, fields=['total'])
+            logger.info(f"playlist_resp --> {playlist_resp}")
+            if 'total' not in playlist_resp:
+                logger.warning(f"`total` not in playlist_items() response: {playlist_resp}")
+                continue
 
-            # add extra track info (acousticness/dancceability/energy/etc)
-            track_uris = [t['track']['uri'] for t in tracks]
-            feats = client.audio_features(tracks=track_uris)
+            tracks = []
+            total = playlist_resp['total']
+            tracks_count = len(tracks)
+            while tracks_count < total:
+                playlist_info = client.playlist_items(playlist_id, offset=tracks_count)
+                playlist_tracks = playlist_info['items']
+                logger.info(f"playlist `{playlist_id}` tracks ({tracks_count}/{total}) --> {pprint.pformat(playlist_info, depth=2)}")
+                tracks += playlist_tracks
+                tracks_count = len(tracks)
 
-            for playlist_track, feat in zip(tracks, feats):
-                track = playlist_track['track']
-                track['user_playlist'] = playlist_id_to_name[playlist_id]
-                feat_rec = {"audio_feature." + k: v for k, v in feat.items()}
-                track.update(feat_rec)
+                # add extra track info (acousticness/dancceability/energy/etc)
+                track_uris = [t['track']['uri'] for t in playlist_tracks]
+                feats = client.audio_features(tracks=track_uris)
 
-                for k, v in playlist_track.items():
-                    if isinstance(v, (dict, list)):
-                        logger.warning(f"not adding {type(v)} --> {k}: {v}")
-                        continue
-                    track[k] = v
+                for playlist_track, feat in zip(playlist_tracks, feats):
+                    track = playlist_track['track']
+                    track['user_playlist'] = playlist_id_to_name[playlist_id]
+                    feat_rec = {"audio_feature." + k: v for k, v in feat.items()}
+                    track.update(feat_rec)
 
-                if track not in data:
-                    data.append(track)
+                    for k, v in playlist_track.items():
+                        if isinstance(v, (dict, list)):
+                            logger.warning(f"not adding {type(v)} --> {k}: {v}")
+                            continue
+                        track[k] = v
+
+                    if track not in data:
+                        data.append(track)
 
         df = pd.json_normalize(data)
         df['artists'] = df['artists'].apply(
@@ -188,6 +209,18 @@ def register_callbacks(app):
                 logger.error(f"error expanding `{col}`: {e} --> {df[col].values[0]}")
                 df.drop(col, axis=1, inplace=True)
         return df.to_dict("records")
+
+
+    @app.callback(
+        Output('scatter-colorby', 'value'),
+        Input('track-data', 'data'),
+        State('scatter-colorby', 'value'),
+    )
+    def set_default_colorby(data, colorby):
+        if not data:
+            return dash.no_update
+        colorby = colorby or 'user_playlist'
+        return colorby
 
 
     @app.callback(
