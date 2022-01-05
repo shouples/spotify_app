@@ -6,6 +6,8 @@ import spotipy
 import dash
 import os
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objs as go
 import pprint
 from urllib import parse
 
@@ -122,8 +124,19 @@ def register_callbacks(app):
         logger.info(f"playlist `{playlist}` track --> {pprint.pformat(playlist_info, depth=2)}")
 
         data = []
-        for playlist_track in playlist_info['tracks']['items']:
+        tracks = playlist_info['tracks']['items']
+        feats = client.audio_features(tracks=[t['track']['uri'] for t in tracks])
+        for playlist_track, feat in zip(tracks, feats):
             track = playlist_track['track']
+
+            feat_rec = {"feat." + k: v for k, v in feat.items()}
+            track.update(feat)
+
+            for k, v in playlist_track.items():
+                if isinstance(v, (dict, list)):
+                    continue
+                track[k] = v
+
             if track not in data:
                 data.append(track)
         df = pd.json_normalize(data)
@@ -208,5 +221,62 @@ def register_callbacks(app):
         ]
         columns = sorted(columns, key=lambda x: x['label'])
         return [columns] * 4
+
+
+    @app.callback(
+        Output('scatter', 'figure'),
+        [
+            Input('scatter-render', 'n_clicks'),
+            Input('scatter-colorby', 'value'),
+        ],
+        [
+            State('track-data', 'data'),
+            State('scatter-xaxis', 'value'),
+            State('scatter-yaxis', 'value'),
+            State('scatter-zaxis', 'value'),
+        ]
+    )
+    def render_scatterplot(clicks, colorby, data, xaxis, yaxis, zaxis):
+        fig = go.Figure()
+        fig.update_layout(
+            template='plotly_white',
+            height=600,
+            margin=dict(t=30, l=0, r=0, b=0),
+        )
+
+        if not data:
+            return fig
+
+        df = pd.DataFrame(data)
+        
+        df['color'] = ''
+        if colorby is not None:
+            df['color'] = df[colorby]
+
+        if zaxis is not None:
+            for group, group_df in df.groupby('color'):
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=group_df[xaxis],
+                        y=group_df[yaxis],
+                        z=group_df[zaxis],
+                        name=group,
+                        mode='markers',
+                    )
+                )
+
+        else:
+            # 2D plot
+            for group, group_df in df.groupby('color'):
+                fig.add_trace(
+                    go.Scatter(
+                        x=group_df[xaxis],
+                        y=group_df[yaxis],
+                        name=group,
+                        mode='markers',
+                    )
+                )
+        return fig
+
 
     return app
