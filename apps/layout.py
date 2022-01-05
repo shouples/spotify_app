@@ -32,18 +32,22 @@ sign_in = html.Div(
 )
 
 
-TAB_STYLE = {
-    'background-color': '#222',
+LABEL_STYLE = {
+    'color': 'white',
+    'backgroundColor': '#191919',
 }
-ACTIVE_TAB_STYLE = {
-    'color': GREEN
+ACTIVE_LABEL_STYLE = {
+    'color': GREEN,
+    'backgroundColor': '#191919',
+    #'border': '1px solid green',
+    'boxShadow': f'inset 0 -2px 0 {GREEN}'
 }
 
 visualizations = dbc.Tabs(
     [
         dbc.Tab(
-            tab_style=TAB_STYLE,
-            active_tab_style=ACTIVE_TAB_STYLE,
+            label_style=LABEL_STYLE,
+            active_label_style=ACTIVE_LABEL_STYLE,
             label='Scatter/Line',
             children=[
                 dbc.Row([
@@ -67,18 +71,17 @@ visualizations = dbc.Tabs(
             style={'padding': '1rem'}
         ),
         dbc.Tab(
-            tab_style=TAB_STYLE,
-            active_tab_style=ACTIVE_TAB_STYLE,
+            label_style=LABEL_STYLE,
+            active_label_style=ACTIVE_LABEL_STYLE,
             label='Polar',
         ),
         dbc.Tab(
-            tab_style=TAB_STYLE,
-            active_tab_style=ACTIVE_TAB_STYLE,
+            label_style=LABEL_STYLE,
+            active_label_style=ACTIVE_LABEL_STYLE,
             label='Ternary',
         ),
     ],
     style={
-        'background-color': '#222',
         'border-width': '0px',
     }
 )
