@@ -110,38 +110,47 @@ def register_callbacks(app):
         [
             State('sign-in-token', 'data'),
             State('user-playlists', 'value'),
+            State('user-playlists', 'options'),
         ]
     )
-    def load_playlist_tracks(clicks, token, playlist):
-        if not (token and playlist):
+    def load_playlist_tracks(clicks, token, playlist_ids, playlist_options):
+        if not (token and playlist_ids):
             return []
 
         auth_manager = spotipy.oauth2.SpotifyOAuth(scope=SCOPE)
         auth_manager.get_access_token(token)
         client = spotipy.Spotify(auth_manager=auth_manager)
 
-        playlist_info = client.playlist(playlist)
-        logger.info(f"playlist `{playlist}` track --> {pprint.pformat(playlist_info, depth=2)}")
-
+        playlist_id_to_name = {p['value']: p['label'] for p in playlist_options}
         data = []
-        tracks = playlist_info['tracks']['items']
-        feats = client.audio_features(tracks=[t['track']['uri'] for t in tracks])
-        for playlist_track, feat in zip(tracks, feats):
-            track = playlist_track['track']
+        for playlist_id in playlist_ids:
+            # pull playlist information to get tracks
+            playlist_info = client.playlist(playlist_id)
+            logger.info(f"playlist `{playlist_id}` track --> {pprint.pformat(playlist_info, depth=2)}")
+            tracks = playlist_info['tracks']['items']
 
-            feat_rec = {"feat." + k: v for k, v in feat.items()}
-            track.update(feat)
+            # add extra track info (acousticness/dancceability/energy/etc)
+            track_uris = [t['track']['uri'] for t in tracks]
+            feats = client.audio_features(tracks=track_uris)
 
-            for k, v in playlist_track.items():
-                if isinstance(v, (dict, list)):
-                    continue
-                track[k] = v
+            for playlist_track, feat in zip(tracks, feats):
+                track = playlist_track['track']
+                track['user_playlist'] = playlist_id_to_name[playlist_id]
+                feat_rec = {"audio_feature." + k: v for k, v in feat.items()}
+                track.update(feat_rec)
 
-            if track not in data:
-                data.append(track)
+                for k, v in playlist_track.items():
+                    if isinstance(v, (dict, list)):
+                        logger.warning(f"not adding {type(v)} --> {k}: {v}")
+                        continue
+                    track[k] = v
+
+                if track not in data:
+                    data.append(track)
+
         df = pd.json_normalize(data)
         df['artists'] = df['artists'].apply(
-            lambda x: ", ".join([a['name'] for a in x])
+            lambda x: ", ".join(sorted([a['name'] for a in x]))
         )
 
         for col in df.columns:
@@ -226,17 +235,14 @@ def register_callbacks(app):
     @app.callback(
         Output('scatter', 'figure'),
         [
-            Input('scatter-render', 'n_clicks'),
+            Input('scatter-xaxis', 'value'),
+            Input('scatter-yaxis', 'value'),
+            Input('scatter-zaxis', 'value'),
             Input('scatter-colorby', 'value'),
         ],
-        [
-            State('track-data', 'data'),
-            State('scatter-xaxis', 'value'),
-            State('scatter-yaxis', 'value'),
-            State('scatter-zaxis', 'value'),
-        ]
+        State('track-data', 'data'),
     )
-    def render_scatterplot(clicks, colorby, data, xaxis, yaxis, zaxis):
+    def render_scatterplot(xaxis, yaxis, zaxis, colorby, data):
         fig = go.Figure()
         fig.update_layout(
             template='plotly_white',
@@ -244,7 +250,7 @@ def register_callbacks(app):
             margin=dict(t=30, l=0, r=0, b=0),
         )
 
-        if not data:
+        if not (data and xaxis and yaxis):
             return fig
 
         df = pd.DataFrame(data)
@@ -264,6 +270,13 @@ def register_callbacks(app):
                         mode='markers',
                     )
                 )
+            fig.update_layout(
+                scene=dict(
+                    xaxis_title=xaxis,
+                    yaxis_title=yaxis,
+                    zaxis_title=zaxis,
+                )
+            )
 
         else:
             # 2D plot
@@ -276,6 +289,12 @@ def register_callbacks(app):
                         mode='markers',
                     )
                 )
+            fig.update_layout(
+                xaxis_title=xaxis,
+                yaxis_title=yaxis,
+                zaxis_title=zaxis,
+            )
+            
         return fig
 
 

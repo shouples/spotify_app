@@ -41,20 +41,12 @@ visualizations = dbc.Card(
                         dbc.Col("Y-axis"),
                         dbc.Col("Z-axis"),
                         dbc.Col("Colorby"),
-                        dbc.Col(), 
                     ]),
                     dbc.Row([
                         dbc.Col(dcc.Dropdown(id='scatter-xaxis')),
                         dbc.Col(dcc.Dropdown(id='scatter-yaxis')),
                         dbc.Col(dcc.Dropdown(id='scatter-zaxis')),
                         dbc.Col(dcc.Dropdown(id='scatter-colorby')),
-                        dbc.Col(
-                            dmc.Button(
-                                "Render",
-                                id='scatter-render', 
-                                color='green'
-                            )
-                        ),
                     ]),
 
                     html.Div(
@@ -99,7 +91,10 @@ content = html.Div(
             dbc.Col(
                 [
                     dcc.Loading(
-                        dcc.Dropdown(id='user-playlists')
+                        dcc.Dropdown(
+                            id='user-playlists',
+                            multi=True,
+                        )
                     ),
                 ],
                 width=10,
