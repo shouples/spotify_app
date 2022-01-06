@@ -1,3 +1,3 @@
-Sample app for testing the spotify auth, API calls, and some plotly viz.
+Sample app for testing the spotify auth, API calls, and some plotly viz. 
 
-![](https://github.com/shouples/spotify_app/blob/main/Screenshot%202022-01-04%20203517.png)
+![](https://github.com/shouples/spotify_app/blob/main/img/Screenshot%202022-01-05%20194507.png)
