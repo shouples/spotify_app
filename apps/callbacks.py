@@ -21,6 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+CHAR_LIMIT = 40
 SCOPE = 'user-library-read playlist-read-private'
 
 
@@ -123,11 +124,10 @@ def register_callbacks(app):
         playlists = playlist_resp['items']
         logger.info(f"playlists: {len(playlists)} --> {playlists[0]}")
 
-        char_limit = 40
         options = []
         for playlist in playlists:
-            playlist_label = playlist['name'][:char_limit]
-            if len(playlist['name']) > char_limit:
+            playlist_label = playlist['name'][:CHAR_LIMIT]
+            if len(playlist['name']) > CHAR_LIMIT:
                 playlist_label += "..."
             options.append({
                 'label': playlist_label, 
@@ -208,6 +208,12 @@ def register_callbacks(app):
             except Exception as e:
                 logger.error(f"error expanding `{col}`: {e} --> {df[col].values[0]}")
                 df.drop(col, axis=1, inplace=True)
+
+        for col in ['added_at', 'album.release_date']:
+            if col not in df.columns:
+                df[col] = pd.NA
+            df[col] = pd.to_datetime(df[col])
+
         return df.to_dict("records")
 
 
@@ -215,6 +221,18 @@ def register_callbacks(app):
         Output('scatter-colorby', 'value'),
         Input('track-data', 'data'),
         State('scatter-colorby', 'value'),
+    )
+    def set_default_colorby(data, colorby):
+        if not data:
+            return dash.no_update
+        colorby = colorby or 'user_playlist'
+        return colorby
+
+    
+    @app.callback(
+        Output('polar-colorby', 'value'),
+        Input('track-data', 'data'),
+        State('polar-colorby', 'value'),
     )
     def set_default_colorby(data, colorby):
         if not data:
@@ -275,6 +293,8 @@ def register_callbacks(app):
             Output('scatter-yaxis', 'options'),
             Output('scatter-zaxis', 'options'),
             Output('scatter-colorby', 'options'),
+            Output('polar-dims', 'options'),
+            Output('polar-colorby', 'options'),
         ],
         Input('track-data', 'data'),
     )
@@ -288,7 +308,7 @@ def register_callbacks(app):
             for col in df.columns
         ]
         columns = sorted(columns, key=lambda x: x['label'])
-        return [columns] * 4
+        return [columns] * 6
 
 
     @app.callback(
@@ -298,10 +318,11 @@ def register_callbacks(app):
             Input('scatter-yaxis', 'value'),
             Input('scatter-zaxis', 'value'),
             Input('scatter-colorby', 'value'),
+            Input('scatter-showlines', 'value'),
         ],
         State('track-data', 'data'),
     )
-    def render_scatterplot(xaxis, yaxis, zaxis, colorby, data):
+    def render_scatterplot(xaxis, yaxis, zaxis, colorby, show_lines, data):
         fig = go.Figure()
         fig.update_layout(
             template='plotly_dark',
@@ -318,15 +339,26 @@ def register_callbacks(app):
         if colorby is not None:
             df['color'] = df[colorby]
 
+        mode = 'markers'
+        if show_lines:
+            mode = 'markers+lines'
+            df.sort_values(xaxis, inplace=True)
+
         if zaxis is not None:
             for group, group_df in df.groupby('color'):
+                group_label = group[:CHAR_LIMIT]
+                if len(group) > CHAR_LIMIT:
+                    group_label += "..."
                 fig.add_trace(
                     go.Scatter3d(
                         x=group_df[xaxis],
                         y=group_df[yaxis],
                         z=group_df[zaxis],
-                        name=group,
-                        mode='markers',
+                        name=group_label,
+                        mode=mode,
+                        marker=dict(
+                            opacity=0.6,
+                        ),
                     )
                 )
             fig.update_layout(
@@ -340,17 +372,113 @@ def register_callbacks(app):
         else:
             # 2D plot
             for group, group_df in df.groupby('color'):
+                group_label = group[:CHAR_LIMIT]
+                if len(group) > CHAR_LIMIT:
+                    group_label += "..."
                 fig.add_trace(
                     go.Scatter(
                         x=group_df[xaxis],
                         y=group_df[yaxis],
-                        name=group,
-                        mode='markers',
+                        name=group_label,
+                        mode=mode,
+                        marker=dict(
+                            opacity=0.6,
+                        ),
                     )
                 )
             fig.update_layout(
                 xaxis_title=xaxis,
                 yaxis_title=yaxis,
+            )
+
+        return fig
+
+
+    @app.callback(
+        Output('polar-dims', 'value'),
+        Input('track-data', 'data'),
+        State('polar-dims', 'value'),
+    )
+    def show_default_polar_dimensions(data, dims):
+        if not data:
+            return []
+        df = pd.DataFrame(data)
+        default_dims = [
+            'audio_feature.acousticness',
+            'audio_feature.danceability',
+            'audio_feature.energy',
+            'audio_feature.instrumentalness',
+            'audio_feature.liveness',
+            'audio_feature.speechiness',
+            'audio_feature.valence',
+        ]
+        dims = dims or default_dims
+        return dims
+
+
+    @app.callback(
+        Output('polar', 'figure'),
+        [
+            Input('polar-dims', 'value'),
+            Input('polar-range-min', 'value'),
+            Input('polar-range-max', 'value'),
+            Input('polar-colorby', 'value'),
+            Input('polar-showlines', 'value'),
+        ],
+        State('track-data', 'data'),
+    )
+    def render_polarplot(dims, range_min, range_max, colorby, show_lines, data):
+        fig = go.Figure()
+        fig.update_layout(
+            template='plotly_dark',
+            height=600,
+            margin=dict(t=10, l=0, r=0, b=10),
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[range_min, range_max]
+                )
+            ),
+        )
+
+        if not (data and dims):
+            return fig
+        if len(dims) < 2:
+            return fig
+
+        df = pd.DataFrame(data)
+        
+        df['color'] = ''
+        if colorby is not None:
+            df['color'] = df[colorby]
+
+        mode = 'markers'
+        fill = None
+        if show_lines:
+            mode = 'markers+lines'
+            fill = 'toself'
+            
+        for group, group_df in df.groupby('color'):
+            group_label = group[:CHAR_LIMIT]
+            if len(group) > CHAR_LIMIT:
+                group_label += "..."
+
+            melted_df = group_df.melt(
+                id_vars=['id'],
+                value_vars=dims,
+            ).sort_values(['id', 'variable'])
+
+            fig.add_trace(
+                go.Scatterpolargl(
+                    r=melted_df['value'],
+                    theta=melted_df['variable'],
+                    marker=dict(
+                        opacity=0.5,
+                    ),
+                    fill=fill,
+                    mode=mode,
+                    name=group_label,
+                ),
             )
 
         return fig

@@ -39,47 +39,85 @@ LABEL_STYLE = {
 ACTIVE_LABEL_STYLE = {
     'color': GREEN,
     'backgroundColor': '#191919',
-    #'border': '1px solid green',
     'boxShadow': f'inset 0 -2px 0 {GREEN}'
 }
 
+scatterplot_tab = dbc.Tab(
+    label_style=LABEL_STYLE,
+    active_label_style=ACTIVE_LABEL_STYLE,
+    label='Scatter/Line',
+    children=[
+        dbc.Row([
+            dbc.Col(dbc.FormText("X-axis")),
+            dbc.Col(dbc.FormText("Y-axis")),
+            dbc.Col(dbc.FormText("Z-axis")),
+            dbc.Col(dbc.FormText("Colorby")),
+            dbc.Col(dbc.FormText("")),
+        ]),
+        dbc.Row([
+            dbc.Col(dcc.Dropdown(id='scatter-xaxis')),
+            dbc.Col(dcc.Dropdown(id='scatter-yaxis')),
+            dbc.Col(dcc.Dropdown(id='scatter-zaxis')),
+            dbc.Col(dcc.Dropdown(id='scatter-colorby')),
+            dbc.Col(dbc.Switch(
+                id='scatter-showlines',
+                label="Show lines?",
+            )),
+        ]),
+        html.Div(
+            dcc.Graph(id='scatter'),
+            className='my-4',
+        ),
+    ],
+    style={'padding': '1rem'}
+)
+
+polarplot_tab = dbc.Tab(
+    label_style=LABEL_STYLE,
+    active_label_style=ACTIVE_LABEL_STYLE,
+    label='Polar',
+    children=[
+        dbc.Row([
+            dbc.Col(dbc.FormText("Dimensions (theta)"), width=6),
+            dbc.Col(dbc.FormText("Range")),
+            dbc.Col(),
+            dbc.Col(dbc.FormText("Colorby")),
+            dbc.Col(dbc.FormText("")),
+        ]),
+        dbc.Row([
+            dbc.Col(dcc.Dropdown(id='polar-dims', multi=True), width=6),
+            dbc.Col(dbc.Input(id='polar-range-min', type='number')),
+            dbc.Col(dbc.Input(id='polar-range-max', type='number')),
+            dbc.Col(dcc.Dropdown(id='polar-colorby')),
+            dbc.Col(dbc.Switch(
+                id='polar-showlines',
+                label="Fill?",
+                value=True,
+            )),
+        ]),
+        html.Div(
+            dcc.Graph(id='polar'),
+            className='my-4',
+        ),
+    ],
+    style={'padding': '1rem'}
+)
+
+ternaryplot_tab = dbc.Tab(
+    label_style=LABEL_STYLE,
+    active_label_style=ACTIVE_LABEL_STYLE,
+    label='Ternary',
+    children=[
+
+    ],
+    style={'padding': '1rem'}
+)
+
 visualizations = dbc.Tabs(
     [
-        dbc.Tab(
-            label_style=LABEL_STYLE,
-            active_label_style=ACTIVE_LABEL_STYLE,
-            label='Scatter/Line',
-            children=[
-                dbc.Row([
-                    dbc.Col(dbc.FormText("X-axis")),
-                    dbc.Col(dbc.FormText("Y-axis")),
-                    dbc.Col(dbc.FormText("Z-axis")),
-                    dbc.Col(dbc.FormText("Colorby")),
-                ]),
-                dbc.Row([
-                    dbc.Col(dcc.Dropdown(id='scatter-xaxis')),
-                    dbc.Col(dcc.Dropdown(id='scatter-yaxis')),
-                    dbc.Col(dcc.Dropdown(id='scatter-zaxis')),
-                    dbc.Col(dcc.Dropdown(id='scatter-colorby')),
-                ]),
-
-                html.Div(
-                    dcc.Graph(id='scatter'),
-                    className='my-4',
-                ),
-            ],
-            style={'padding': '1rem'}
-        ),
-        dbc.Tab(
-            label_style=LABEL_STYLE,
-            active_label_style=ACTIVE_LABEL_STYLE,
-            label='Polar',
-        ),
-        dbc.Tab(
-            label_style=LABEL_STYLE,
-            active_label_style=ACTIVE_LABEL_STYLE,
-            label='Ternary',
-        ),
+        scatterplot_tab,
+        polarplot_tab,
+        ternaryplot_tab,
     ],
     style={
         'border-width': '0px',
@@ -170,6 +208,7 @@ content = html.Div(
                 filter_action="native",
                 sort_action="native",
                 sort_mode="multi",
+                #row_selectable="single",
             ),
             className='my-4',
         ),
