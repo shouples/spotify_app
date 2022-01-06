@@ -6,11 +6,18 @@ p {
     color: #eee;
 }
 
-.form-text {
+.form-text, .form-label {
     color: #eee;
 }
 
 .mantine-Chips-label, .mantine-Chips-filled{
-    background-color: #555;
+    background-color: #aaa;
     color: white,
+}
+
+.form-check-input {
+    background-color: #333;
+}
+.form-check-input:checked {
+    background-color: #40c057;
 }
