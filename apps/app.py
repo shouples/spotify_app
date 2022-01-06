@@ -8,6 +8,7 @@ import flask
 
 app = dash.Dash(
     server=flask.Flask(__name__),
+    title="Spotiviz",
     external_stylesheets=[
         dbc.themes.ZEPHYR,
         dbc.icons.FONT_AWESOME,
