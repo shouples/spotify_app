@@ -6,7 +6,7 @@ services:
     build: 
       context: ./build
     #command: "uvicorn app:server --host 0.0.0.0 --port 8050 --log-level debug --workers 3"
-    command: "python app.py"
+    command: "poetry run python app.py"
     environment:
       - SPOTIPY_CLIENT_ID
       - SPOTIPY_CLIENT_SECRET
