@@ -1,0 +1,25 @@
+version: "3.5"
+
+services:
+  
+  app:
+    build: 
+      context: ./build
+    #command: "uvicorn app:server --host 0.0.0.0 --port 8050 --log-level debug --workers 3"
+    command: "python app.py"
+    environment:
+      - SPOTIPY_CLIENT_ID
+      - SPOTIPY_CLIENT_SECRET
+      - SPOTIPY_REDIRECT_URI
+    networks:
+      - default
+    ports:
+      - 8051:8050
+    volumes:
+      - ./apps:/apps
+    working_dir: /apps
+
+
+networks:
+  default:
+    attachable: true
